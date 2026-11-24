@@ -1,0 +1,8 @@
+{
+  "name": "Meridian Compound Interest Calculator",
+  "description": "Interactive investment growth calculator and compounding ledger comparing total contributions against compound returns over time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
