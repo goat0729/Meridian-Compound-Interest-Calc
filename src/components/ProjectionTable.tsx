@@ -5,6 +5,7 @@ interface ProjectionTableProps {
   schedule: YearlyDataPoint[];
   crossoverYear: number | null;
   inflectionYear: number | null;
+  showFees?: boolean;
 }
 
 type TableDensity = 'all' | 'milestones';
@@ -13,6 +14,7 @@ export function ProjectionTable({
   schedule,
   crossoverYear,
   inflectionYear,
+  showFees = false,
 }: ProjectionTableProps) {
   const [density, setDensity] = useState<TableDensity>('all');
 
@@ -34,7 +36,7 @@ export function ProjectionTable({
     <section
       id="schedule"
       aria-label="Annual Compounding Schedule"
-      className="rounded-xl border border-slate-200 bg-white"
+      className="scroll-mt-20 rounded-xl border border-slate-200 bg-white"
     >
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 px-6 py-4">
         <div>
@@ -92,6 +94,11 @@ export function ProjectionTable({
               <th scope="col" className="px-3 py-3 text-right whitespace-nowrap">
                 Annual Interest
               </th>
+              {showFees && (
+                <th scope="col" className="px-3 py-3 text-right whitespace-nowrap">
+                  Annual Fees
+                </th>
+              )}
               <th scope="col" className="px-3 py-3 text-right whitespace-nowrap">
                 Total Contributions
               </th>
@@ -147,6 +154,11 @@ export function ProjectionTable({
                   <td className="px-3 py-2.5 text-right font-mono text-xs font-medium text-emerald-700 tabular-nums">
                     {row.year === 0 ? '$0' : `+${formatCurrency(row.annualInterest)}`}
                   </td>
+                  {showFees && (
+                    <td className="px-3 py-2.5 text-right font-mono text-xs text-rose-700 tabular-nums">
+                      {row.year === 0 ? '$0' : `-${formatCurrency(row.annualFees)}`}
+                    </td>
+                  )}
                   <td className="px-3 py-2.5 text-right font-mono text-xs text-slate-800 tabular-nums">
                     {formatCurrency(row.totalContributions)}
                   </td>

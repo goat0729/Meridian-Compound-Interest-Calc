@@ -9,6 +9,7 @@ interface GrowthChartProps {
   schedule: YearlyDataPoint[];
   initialAmount: number;
   inflationRate: number;
+  volatility: number;
   crossoverYear: number | null;
 }
 
@@ -18,6 +19,7 @@ export function GrowthChart({
   schedule,
   initialAmount,
   inflationRate,
+  volatility,
   crossoverYear,
 }: GrowthChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -65,7 +67,9 @@ export function GrowthChart({
   const { yMax, yTicks } = useMemo(() => {
     const rawMax = Math.max(
       1000,
-      ...schedule.map((d) => Math.max(d.endingBalance, d.realEndingBalance))
+      ...schedule.map((d) =>
+        Math.max(d.endingBalance, d.realEndingBalance, d.p90Balance, d.totalContributions)
+      )
     );
     // Nice step calculation for 5 ticks
     const roughStep = rawMax / 4;
@@ -121,12 +125,27 @@ export function GrowthChart({
   // Build SVG paths for stacked area mode
   const paths = useMemo(() => {
     if (schedule.length === 0) {
-      return { totalLine: '', contribLine: '', realLine: '', contribArea: '', growthArea: '' };
+      return {
+        totalLine: '',
+        contribLine: '',
+        realLine: '',
+        contribArea: '',
+        growthArea: '',
+        volBandArea: '',
+        p10Line: '',
+        p90Line: '',
+      };
     }
 
     const totalPts = schedule.map((d) => `${getX(d.year).toFixed(1)},${getY(d.endingBalance).toFixed(1)}`);
     const contribPts = schedule.map((d) => `${getX(d.year).toFixed(1)},${getY(d.totalContributions).toFixed(1)}`);
     const realPts = schedule.map((d) => `${getX(d.year).toFixed(1)},${getY(d.realEndingBalance).toFixed(1)}`);
+    const p90Pts = schedule.map((d) => `${getX(d.year).toFixed(1)},${getY(d.p90Balance).toFixed(1)}`);
+    const p10Pts = schedule.map((d) => `${getX(d.year).toFixed(1)},${getY(d.p10Balance).toFixed(1)}`);
+    const p10Reversed = [...schedule]
+      .reverse()
+      .map((d) => `${getX(d.year).toFixed(1)},${getY(d.p10Balance).toFixed(1)}`);
+
     const contribReversed = [...schedule]
       .reverse()
       .map((d) => `${getX(d.year).toFixed(1)},${getY(d.totalContributions).toFixed(1)}`);
@@ -141,6 +160,9 @@ export function GrowthChart({
       realLine: `M ${realPts.join(' L ')}`,
       contribArea: `M ${firstX},${baseY} L ${contribPts.join(' L ')} L ${lastX},${baseY} Z`,
       growthArea: `M ${totalPts.join(' L ')} L ${contribReversed.join(' L ')} Z`,
+      volBandArea: `M ${p90Pts.join(' L ')} L ${p10Reversed.join(' L ')} Z`,
+      p10Line: `M ${p10Pts.join(' L ')}`,
+      p90Line: `M ${p90Pts.join(' L ')}`,
     };
   }, [schedule, innerWidth, innerHeight, yMax, chartMode]);
 
@@ -194,6 +216,7 @@ export function GrowthChart({
       : 0;
   const activeContribPct = 100 - activeGrowthPct;
   const showRealOverlay = inflationRate > 0;
+  const showVolBand = volatility > 0;
 
   const barSlotWidth = innerWidth / Math.max(1, schedule.length);
   const barWidth = Math.max(3, Math.min(28, barSlotWidth * 0.68));
@@ -202,7 +225,7 @@ export function GrowthChart({
     <section
       id="growth-chart"
       aria-label="Investment Growth Chart"
-      className="rounded-xl border border-slate-200 bg-white p-6"
+      className="scroll-mt-20 rounded-xl border border-slate-200 bg-white p-6"
     >
       {/* Chart Header & Mode Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -228,13 +251,22 @@ export function GrowthChart({
               <span className="inline-block h-2.5 w-2.5 rounded-xs bg-slate-800" aria-hidden="true" />
               <span>Total Contributions</span>
             </div>
-            {showRealOverlay && chartMode === 'area' && (
+            {showRealOverlay && (
               <div className="flex items-center gap-2">
                 <span
                   className="inline-block w-4 border-t-2 border-dashed border-sky-600"
                   aria-hidden="true"
                 />
                 <span>Real Value (Today&apos;s $)</span>
+              </div>
+            )}
+            {showVolBand && chartMode === 'area' && (
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-block h-2.5 w-3.5 rounded-xs border border-emerald-400/60 bg-emerald-500/15"
+                  aria-hidden="true"
+                />
+                <span>10th–90th %ile Range</span>
               </div>
             )}
             {initialAmount > 0 && chartMode === 'area' && (
@@ -378,6 +410,27 @@ export function GrowthChart({
             {/* Area Mode */}
             {chartMode === 'area' && (
               <>
+                {showVolBand && (
+                  <>
+                    <path d={paths.volBandArea} fill="#10b981" fillOpacity={0.09} />
+                    <path
+                      d={paths.p90Line}
+                      fill="none"
+                      stroke="#10b981"
+                      strokeOpacity={0.45}
+                      strokeWidth={1}
+                      strokeDasharray="2 3"
+                    />
+                    <path
+                      d={paths.p10Line}
+                      fill="none"
+                      stroke="#10b981"
+                      strokeOpacity={0.45}
+                      strokeWidth={1}
+                      strokeDasharray="2 3"
+                    />
+                  </>
+                )}
                 <path d={paths.contribArea} fill="url(#contribGradient)" />
                 <path d={paths.growthArea} fill="url(#growthGradient)" />
 
@@ -395,28 +448,32 @@ export function GrowthChart({
                 )}
 
                 {/* Crossover Year Marker */}
-                {crossoverYear !== null && crossoverYear <= maxYear && (
-                  <g>
-                    <line
-                      x1={getX(crossoverYear)}
-                      x2={getX(crossoverYear)}
-                      y1={0}
-                      y2={innerHeight}
-                      stroke="#10b981"
-                      strokeWidth={1}
-                      strokeDasharray="3 3"
-                      opacity={0.55}
-                    />
-                    <text
-                      x={Math.min(innerWidth - 6, Math.max(6, getX(crossoverYear) + 6))}
-                      y={12}
-                      textAnchor={getX(crossoverYear) > innerWidth * 0.72 ? 'end' : 'start'}
-                      className="fill-emerald-700 font-sans text-[11px] font-medium"
-                    >
-                      Growth &gt; Contributions (Yr {crossoverYear})
-                    </text>
-                  </g>
-                )}
+                {crossoverYear !== null && crossoverYear <= maxYear && (() => {
+                  const cx = getX(crossoverYear);
+                  const anchorRight = cx > innerWidth * 0.65;
+                  return (
+                    <g>
+                      <line
+                        x1={cx}
+                        x2={cx}
+                        y1={0}
+                        y2={innerHeight}
+                        stroke="#10b981"
+                        strokeWidth={1}
+                        strokeDasharray="3 3"
+                        opacity={0.55}
+                      />
+                      <text
+                        x={anchorRight ? cx - 6 : cx + 6}
+                        y={12}
+                        textAnchor={anchorRight ? 'end' : 'start'}
+                        className="fill-emerald-700 font-sans text-[11px] font-medium"
+                      >
+                        Growth &gt; Contributions (Yr {crossoverYear})
+                      </text>
+                    </g>
+                  );
+                })()}
 
                 {/* Crisp Stroke Curves */}
                 <path
@@ -481,6 +538,17 @@ export function GrowthChart({
                         fill={isSelected ? '#047857' : '#10b981'}
                       />
                     )}
+                    {/* Real Value (Inflation-Adjusted) Marker */}
+                    {showRealOverlay && (
+                      <line
+                        x1={x - 1}
+                        x2={x + barWidth + 1}
+                        y1={getY(d.realEndingBalance)}
+                        y2={getY(d.realEndingBalance)}
+                        stroke="#0284c7"
+                        strokeWidth={2}
+                      />
+                    )}
                   </g>
                 );
               })}
@@ -527,7 +595,7 @@ export function GrowthChart({
                   stroke="#ffffff"
                   strokeWidth={2}
                 />
-                {showRealOverlay && chartMode === 'area' && (
+                {showRealOverlay && (
                   <circle
                     cx={activeX}
                     cy={activeRealY}
@@ -555,10 +623,15 @@ export function GrowthChart({
           <div
             className="pointer-events-none absolute top-3 z-10 w-60 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-md backdrop-blur-xs"
             style={{
-              left:
-                activeX > innerWidth * 0.55
-                  ? Math.max(8, margin.left + activeX - 256)
-                  : Math.min(dimensions.width - 248, margin.left + activeX + 16),
+              left: Math.max(
+                4,
+                Math.min(
+                  dimensions.width - 244,
+                  activeX > innerWidth * 0.55
+                    ? margin.left + activeX - 256
+                    : margin.left + activeX + 16
+                )
+              ),
             }}
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
@@ -603,6 +676,16 @@ export function GrowthChart({
                   {formatCurrency(activePoint.totalContributions)}
                 </span>
               </div>
+              {showVolBand && activePoint.year > 0 && (
+                <div className="border-t border-slate-100 pt-1.5 text-[11px] text-slate-500">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>10th–90th %ile</span>
+                    <span className="font-mono text-slate-700 tabular-nums">
+                      {formatCompactCurrency(activePoint.p10Balance)}–{formatCompactCurrency(activePoint.p90Balance)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

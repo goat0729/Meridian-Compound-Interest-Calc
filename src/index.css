@@ -65,11 +65,22 @@ input[type="range"].precision-slider::-moz-range-thumb {
   transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease;
 }
 
+input[type="range"].precision-slider::-moz-range-thumb:hover {
+  transform: scale(1.12);
+  background: #047857;
+}
+
+input[type="range"].precision-slider:focus-visible::-moz-range-thumb {
+  outline: 2px solid #059669;
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
-  input[type="range"].precision-slider::-webkit-slider-thumb {
+  input[type="range"].precision-slider::-webkit-slider-thumb,
+  input[type="range"].precision-slider::-moz-range-thumb {
     transition: none;
   }
 }

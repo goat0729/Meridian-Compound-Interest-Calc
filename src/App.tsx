@@ -97,6 +97,22 @@ export default function App() {
             <span className="font-mono tabular-nums">
               {formatPercent(inputs.inflationRate, 1)} Inflation ({formatPercent(summary.realAnnualYield, 2)} Real)
             </span>
+            {inputs.annualFee > 0 && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="font-mono tabular-nums">
+                  {formatPercent(inputs.annualFee, 2)} Fee
+                </span>
+              </>
+            )}
+            {inputs.volatility > 0 && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="font-mono tabular-nums">
+                  {formatPercent(inputs.volatility, 1)} Volatility
+                </span>
+              </>
+            )}
             <span aria-hidden="true">·</span>
             <span className="capitalize">{inputs.compoundingFrequency} Compounding</span>
           </div>
@@ -107,7 +123,7 @@ export default function App() {
           aria-label="Projected Investment Summary"
           className="mt-6 rounded-xl border border-slate-200 bg-white"
         >
-          <div className="grid grid-cols-1 divide-y divide-slate-200 sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x">
+          <div className="grid grid-cols-1 divide-y divide-slate-200 sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4">
             <div className="p-5 sm:p-6">
               <span className="block text-xs font-medium text-slate-500">
                 Projected Future Value
@@ -124,7 +140,7 @@ export default function App() {
               </span>
             </div>
 
-            <div className="p-5 sm:p-6 sm:border-t sm:border-slate-200 lg:border-t-0">
+            <div className="p-5 sm:border-l sm:border-slate-200 sm:p-6">
               <span className="block text-xs font-medium text-slate-500">
                 Total Contributions
               </span>
@@ -136,7 +152,7 @@ export default function App() {
               </span>
             </div>
 
-            <div className="p-5 sm:p-6 lg:border-t-0 sm:border-t sm:border-slate-200">
+            <div className="p-5 sm:border-t sm:border-slate-200 sm:p-6 lg:border-l lg:border-t-0">
               <span className="block text-xs font-medium text-slate-500">
                 Total Compound Growth
               </span>
@@ -148,12 +164,12 @@ export default function App() {
               </span>
             </div>
 
-            <div className="p-5 sm:p-6 sm:border-t sm:border-slate-200 lg:border-t-0">
+            <div className="p-5 sm:border-l sm:border-t sm:border-slate-200 sm:p-6 lg:border-t-0">
               <span className="block text-xs font-medium text-slate-500">
                 Capital Growth Multiple
               </span>
               <span className="mt-1.5 block font-mono text-2xl font-semibold tracking-tight text-slate-900 tabular-nums sm:text-3xl">
-                {summary.growthMultiple.toFixed(2)}×
+                {summary.growthMultiple > 0 ? `${summary.growthMultiple.toFixed(2)}×` : '—'}
               </span>
               <span className="mt-1.5 block text-xs text-slate-500 tabular-nums">
                 {summary.crossoverYear !== null
@@ -226,6 +242,7 @@ export default function App() {
               schedule={summary.schedule}
               initialAmount={inputs.initialAmount}
               inflationRate={inputs.inflationRate}
+              volatility={inputs.volatility}
               crossoverYear={summary.crossoverYear}
             />
 
@@ -236,15 +253,27 @@ export default function App() {
             >
               <div className="p-5">
                 <span className="block text-xs font-medium text-slate-500">
-                  Inflation-Adjusted Value
+                  {inputs.volatility > 0
+                    ? '10th–90th Percentile Range'
+                    : inputs.annualFee > 0
+                      ? 'Cumulative Fees Paid'
+                      : 'Inflation-Adjusted Value'}
                 </span>
                 <span className="mt-1 block font-mono text-lg font-semibold text-sky-700 tabular-nums">
-                  {formatCurrency(summary.realFinalBalance)}
+                  {inputs.volatility > 0
+                    ? `${formatCurrency(summary.p10FinalBalance)} – ${formatCurrency(summary.p90FinalBalance)}`
+                    : inputs.annualFee > 0
+                      ? formatCurrency(summary.totalFees)
+                      : formatCurrency(summary.realFinalBalance)}
                 </span>
                 <span className="mt-1 block text-xs text-slate-500 tabular-nums">
-                  {summary.finalBalance > 0
-                    ? `${formatPercent((summary.realFinalBalance / summary.finalBalance) * 100, 1)} purchasing power vs. nominal`
-                    : 'Today’s purchasing power equivalent'}
+                  {inputs.volatility > 0
+                    ? `Median outcome: ${formatCurrency(summary.medianFinalBalance)}`
+                    : inputs.annualFee > 0
+                      ? `At ${formatPercent(inputs.annualFee, 2)} annual expense ratio`
+                      : summary.finalBalance > 0
+                        ? `${formatPercent((summary.realFinalBalance / summary.finalBalance) * 100, 1)} purchasing power vs. nominal`
+                        : 'Today’s purchasing power equivalent'}
                 </span>
               </div>
 
@@ -285,6 +314,7 @@ export default function App() {
             schedule={summary.schedule}
             crossoverYear={summary.crossoverYear}
             inflectionYear={summary.inflectionYear}
+            showFees={inputs.annualFee > 0}
           />
         </div>
       </main>
@@ -292,7 +322,9 @@ export default function App() {
       <footer className="mx-auto mt-6 max-w-[1440px] border-t border-slate-200 px-6 py-6 text-xs text-slate-500 lg:px-10">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <span>Meridian · Compound Interest Projection Tool</span>
-          <span>Figures reflect deterministic compounding assumptions and exclude taxes or fees.</span>
+          <span>
+            Projections use discrete compounding with optional inflation, fee drag, and 250-path return volatility; taxes are excluded.
+          </span>
         </div>
       </footer>
     </div>

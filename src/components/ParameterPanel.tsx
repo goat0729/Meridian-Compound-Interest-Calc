@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { ChevronDown, RotateCcw } from 'lucide-react';
 import {
   CalculatorInputs,
   CompoundingFrequency,
@@ -55,10 +55,20 @@ function ParameterControl({
   }, [value, isFocused, allowDecimal]);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const nextRaw = e.target.value;
-    setRawText(nextRaw);
+    const raw = e.target.value;
+    let cleaned = raw.replace(allowDecimal ? /[^0-9.]/g : /[^0-9]/g, '');
 
-    const cleaned = nextRaw.replace(/[^0-9.]/g, '');
+    if (allowDecimal) {
+      const firstDot = cleaned.indexOf('.');
+      if (firstDot !== -1) {
+        cleaned =
+          cleaned.slice(0, firstDot + 1) +
+          cleaned.slice(firstDot + 1).replace(/\./g, '');
+      }
+    }
+
+    setRawText(cleaned);
+
     if (cleaned === '' || cleaned === '.') return;
 
     const parsed = allowDecimal ? parseFloat(cleaned) : parseInt(cleaned, 10);
@@ -110,7 +120,7 @@ function ParameterControl({
             onFocus={handleFocus}
             onBlur={handleBlur}
             aria-label={label}
-            className={`w-36 rounded-md border border-slate-200 bg-slate-50 py-1.5 font-mono text-sm font-medium text-slate-900 tabular-nums transition-colors focus:border-emerald-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/15 ${
+            className={`w-40 rounded-md border border-slate-200 bg-slate-50 py-1.5 font-mono text-sm font-medium text-slate-900 tabular-nums transition-colors focus:border-emerald-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/15 ${
               prefix ? 'pl-7' : 'pl-3'
             } ${suffix ? 'pr-9 text-right' : 'pr-3 text-right'}`}
           />
@@ -146,9 +156,9 @@ function ParameterControl({
 }
 
 const PRESETS: Array<{ label: string; rate: number; years: number; monthly: number; initial: number }> = [
-  { label: 'Conservative 5%', initial: 25000, monthly: 600, rate: 5.0, years: 20 },
-  { label: 'Market Avg 8%', initial: 25000, monthly: 750, rate: 8.0, years: 25 },
-  { label: 'Growth 10%', initial: 50000, monthly: 1200, rate: 10.0, years: 30 },
+  { label: 'Conservative', initial: 25000, monthly: 600, rate: 5.0, years: 20 },
+  { label: 'Market Avg', initial: 25000, monthly: 750, rate: 8.0, years: 25 },
+  { label: 'Growth', initial: 50000, monthly: 1200, rate: 10.0, years: 30 },
 ];
 
 const FREQUENCIES: Array<{ value: CompoundingFrequency; label: string }> = [
@@ -169,11 +179,15 @@ export function ParameterPanel({
   effectiveAnnualYield,
   realAnnualYield,
 }: ParameterPanelProps) {
+  const [showAdjustments, setShowAdjustments] = useState(false);
+
   const isDefault =
     inputs.initialAmount === DEFAULT_INPUTS.initialAmount &&
     inputs.monthlyContribution === DEFAULT_INPUTS.monthlyContribution &&
     inputs.annualRate === DEFAULT_INPUTS.annualRate &&
     inputs.inflationRate === DEFAULT_INPUTS.inflationRate &&
+    inputs.annualFee === DEFAULT_INPUTS.annualFee &&
+    inputs.volatility === DEFAULT_INPUTS.volatility &&
     inputs.years === DEFAULT_INPUTS.years &&
     inputs.compoundingFrequency === DEFAULT_INPUTS.compoundingFrequency &&
     inputs.contributionTiming === DEFAULT_INPUTS.contributionTiming;
@@ -182,7 +196,7 @@ export function ParameterPanel({
     <section
       id="parameters"
       aria-label="Investment Parameters"
-      className="rounded-xl border border-slate-200 bg-white p-6"
+      className="scroll-mt-20 rounded-xl border border-slate-200 bg-white p-6"
     >
       <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-4">
         <div>
@@ -227,6 +241,7 @@ export function ParameterPanel({
               <button
                 key={preset.label}
                 type="button"
+                title={`${preset.rate}% return · ${preset.years} yrs · $${preset.monthly.toLocaleString('en-US')}/mo`}
                 onClick={() =>
                   onChange({
                     ...inputs,
@@ -236,7 +251,7 @@ export function ParameterPanel({
                     years: preset.years,
                   })
                 }
-                className={`rounded-md px-2 py-1.5 text-xs font-medium transition-colors whitespace-nowrap truncate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${
+                className={`rounded-md px-2 py-1.5 text-xs font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${
                   active
                     ? 'bg-white text-slate-900 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -370,6 +385,61 @@ export function ParameterPanel({
               );
             })}
           </div>
+        </div>
+
+        {/* Fees & Market Volatility */}
+        <div className="border-t border-slate-100 pt-4">
+          <button
+            type="button"
+            onClick={() => setShowAdjustments((prev) => !prev)}
+            aria-expanded={showAdjustments}
+            className="flex w-full items-center justify-between gap-2 rounded-md py-1 text-left text-xs font-medium text-slate-700 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+          >
+            <span>Fees &amp; Return Volatility</span>
+            <span className="flex items-center gap-2 font-mono text-[11px] font-normal text-slate-500 tabular-nums">
+              {inputs.annualFee.toFixed(2)}% fee · {inputs.volatility.toFixed(1)}% vol
+              <ChevronDown
+                className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-150 ${
+                  showAdjustments ? 'rotate-180' : ''
+                }`}
+                aria-hidden="true"
+              />
+            </span>
+          </button>
+
+          {showAdjustments && (
+            <div className="mt-4 space-y-5">
+              <ParameterControl
+                id="annual-fee"
+                label="Annual Fee (ER)"
+                value={inputs.annualFee}
+                min={0}
+                max={5}
+                sliderMax={3}
+                step={0.05}
+                suffix="%"
+                minLabel="0%"
+                maxLabel="3%+"
+                allowDecimal
+                onUpdate={(val) => onChange({ ...inputs, annualFee: val })}
+              />
+
+              <ParameterControl
+                id="return-volatility"
+                label="Return Volatility (σ)"
+                value={inputs.volatility}
+                min={0}
+                max={35}
+                sliderMax={25}
+                step={0.5}
+                suffix="%"
+                minLabel="0% (Fixed)"
+                maxLabel="25%+"
+                allowDecimal
+                onUpdate={(val) => onChange({ ...inputs, volatility: val })}
+              />
+            </div>
+          )}
         </div>
       </div>
     </section>
